@@ -4,7 +4,7 @@
 # =====================================
 #
 # This script it does ONE thing:
-#   - runs dem.py for a specific drone/gimbal pose
+#   - runs compute_global_coordinates_newton_edm.py for a specific drone/gimbal pose
 #   - intersects the corresponding camera ray with a DEM
 #   - prints the ground point (lat, lon, DEM height)
 #
@@ -25,7 +25,7 @@
 #   6. Report that intersection as the ground point.
 #
 # The Python solver is in:
-#   dem_center_pixel_v9.py
+#   compute_global_coordinates_newton_edm.py
 #
 # This script just:
 #   - sets the input values
@@ -39,7 +39,7 @@
 #
 # The interesting subtlety is the yaw convention.
 #
-# The code (dem_center_pixel_v9.py) works in an ENU-like world frame:
+# The code (compute_global_coordinates_newton_edm.py) works in an ENU-like world frame:
 #   - x ≈ East
 #   - y ≈ North
 #   - z up
@@ -137,14 +137,14 @@ echo
 # 5. RUN THE PYTHON SOLVER
 ###############################################################################
 #
-# We assume dem_center_pixel_v9.py lives in the same directory as this script.
+# We assume compute_global_coordinates_newton_edm.py lives in the same directory as this script.
 # If not, adjust the path below.
 #
 # NOTE: there is NO --yaw_is_heading flag used here.
 #       The yaw has already been converted to the solver’s convention
 #       via the +90° we applied above.
 
-python ./dem_center_pixel_v9.py \
+python ./compute_global_coordinates_newton_edm.py \
     --lat "$LAT_DRONE" \
     --lon "$LON_DRONE" \
     --alt_ortho "$ALT_ORTHO" \
