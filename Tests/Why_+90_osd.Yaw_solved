@@ -1,39 +1,193 @@
-'''
-Why am I adding +90° to the OSD yaw?
+#!/usr/bin/env bash
+#
+# DEM Ray–Intersection Test
+# =====================================
+#
+# This script it does ONE thing:
+#   - runs dem.py for a specific drone/gimbal pose
+#   - intersects the corresponding camera ray with a DEM
+#   - prints the ground point (lat, lon, DEM height)
+#
+# All the explanation is in comments, so you can read this file like
+# a mini-README.
 
-This is the only slightly “tricky” part, so I’ll spell it out.
 
-The code itself works in an ENU-like world frame:
+###############################################################################
+# 1. WHAT THIS SCRIPT DOES
+###############################################################################
+#
+# Pipeline:
+#   1. Take the drone GNSS position (lat, lon, orthometric altitude).
+#   2. Take drone attitude from OSD (yaw, pitch, roll).
+#   3. Take gimbal angles (yaw, pitch, roll).
+#   4. Build the camera ray in world coordinates.
+#   5. March that ray until it hits the DEM surface.
+#   6. Report that intersection as the ground point.
+#
+# The Python solver is in:
+#   dem_center_pixel_v9.py
+#
+# This script just:
+#   - sets the input values
+#   - fixes the yaw convention issue (OSD vs math)
+#   - calls the solver.
 
-x axis ≈ East
 
-y axis ≈ North
+###############################################################################
+# 2. IMPORTANT: WHY I ADD +90° TO THE OSD YAW
+###############################################################################
+#
+# The interesting subtlety is the yaw convention.
+#
+# The code (dem_center_pixel_v9.py) works in an ENU-like world frame:
+#   - x ≈ East
+#   - y ≈ North
+#   - z up
+#
+# The rotation Rz(yaw) inside the code is a standard math rotation:
+#   - yaw = 0° → facing +x (East)
+#   - yaw = 90° → facing +y (North)
+#
+# In many drones, the OSD "yaw" or "heading" is given in a navigation style:
+#   - 0° = North
+#   - 90° = East
+#   - 180° = South
+#   - 270° = West
+#
+# That means the OSD yaw and the yaw used inside the solver do NOT share
+# the same zero direction or sign convention.
+#
+# By comparing results against known points, I found that for my dataset
+# I need to add +90° to the OSD yaw before feeding it to the solver:
+#
+#   yaw_for_solver = osd_yaw + 90°
+#
+# I intentionally keep this correction OUTSIDE the Python solver so that:
+#   - the core code stays generic,
+#   - the test script makes the frame alignment explicit.
+#
+# If you use your own logs, check your own convention and adjust here.
 
-z axis up
 
-The rotation Rz(yaw) is a standard math rotation:
+###############################################################################
+# 3. INPUT VALUES FOR THIS SPECIFIC TEST
+###############################################################################
+#
+# These are the actual values used in my experiment. They are what I use
+# to reproduce the numbers reported in the paper/report.
 
-yaw = 0° → facing +x (East)
+# Drone GNSS position (WGS84)
+LAT_DRONE=41.14583768        # degrees
+LON_DRONE=24.91531038        # degrees
 
-yaw = 90° → facing +y (North)
+# Drone orthometric altitude (height above mean sea level, in meters)
+ALT_ORTHO=124.18             # m (MSL)
 
-In many drone OSDs, however, the “yaw” / “heading” is reported in a more “navigation” style:
+# Raw OSD yaw from the flight log (what the drone reports)
+OSD_YAW=259.0                # degrees
 
-0° = North
+# Drone pitch and roll from OSD
+DRONE_PITCH=-0.2             # degrees
+DRONE_ROLL=0.4               # degrees
 
-90° = East
+# Gimbal orientation (relative to drone body)
+GIMBAL_YAW=94.5              # degrees
+GIMBAL_PITCH=-33.0           # degrees
+GIMBAL_ROLL=0.0              # degrees
 
-180° = South
+# Camera intrinsics
+FX=1601280                   # focal length fx in pixels
+FY=1801440                   # focal length fy in pixels
+CX=2592                      # principal point x (pixels)
+CY=1944                      # principal point y (pixels)
 
-270° = West
+# Image point (pixel coordinates) whose ray we project onto the DEM
+U=1296                       # column index (pixels)
+V=800                        # row index (pixels)
 
-So the OSD yaw and the yaw used inside the math do not share the same zero direction and sign convention.
+# DEM and geoid sources
+DEM_URL="https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N41_00_E024_00_DEM/Copernicus_DSM_COG_10_N41_00_E024_00_DEM.tif"
+GEOID_URL="https://download.osgeo.org/proj/vdatum/egm96_15/egm96_15.gtx"
 
-When I started validating this against ground truth, I noticed a systematic rotation error:
-the reconstructed rays were consistently rotated relative to where they should be.
+# Ray / solver settings
+MAX_RANGE_M=6000             # maximum ray length in meters
+STEP_M=50                    # coarse marching step in meters
+MAX_ITERS=2                  # Newton refinement iterations
+DEBUG_FLAG="--debug"         # leave empty "" if you don't want verbose output
 
-By comparing against known points and map features, I found that:
 
-To align the OSD yaw with the yaw convention used in the solver,
-I need to add +90° before passing it to --drone_yaw.
-'''
+###############################################################################
+# 4. COMPUTE YAW FOR THE SOLVER (APPLY +90° OFFSET HERE)
+###############################################################################
+#
+# Here is where I align the OSD yaw convention with the solver convention.
+#
+# If you use a different drone or log format, this is where you should
+# change the formula, not inside the Python code.
+
+# We use awk to do the floating-point arithmetic in pure bash.
+YAW_FOR_SOLVER=$(awk "BEGIN {print $OSD_YAW + 90.0}")
+
+echo "OSD yaw:         $OSD_YAW degrees"
+echo "Yaw for solver:  $YAW_FOR_SOLVER degrees (OSD yaw + 90°)"
+echo
+
+
+###############################################################################
+# 5. RUN THE PYTHON SOLVER
+###############################################################################
+#
+# We assume dem_center_pixel_v9.py lives in the same directory as this script.
+# If not, adjust the path below.
+#
+# NOTE: there is NO --yaw_is_heading flag used here.
+#       The yaw has already been converted to the solver’s convention
+#       via the +90° we applied above.
+
+python ./dem_center_pixel_v9.py \
+    --lat "$LAT_DRONE" \
+    --lon "$LON_DRONE" \
+    --alt_ortho "$ALT_ORTHO" \
+    \
+    --drone_yaw "$YAW_FOR_SOLVER" \
+    --drone_pitch "$DRONE_PITCH" \
+    --drone_roll "$DRONE_ROLL" \
+    \
+    --gimbal_yaw "$GIMBAL_YAW" \
+    --gimbal_pitch "$GIMBAL_PITCH" \
+    --gimbal_roll "$GIMBAL_ROLL" \
+    \
+    --rcg zforward_to_zdown \
+    \
+    --fx "$FX" \
+    --fy "$FY" \
+    --cx "$CX" \
+    --cy "$CY" \
+    --u "$U" \
+    --v "$V" \
+    \
+    --dem "$DEM_URL" \
+    --geoid "$GEOID_URL" \
+    \
+    --max_range_m "$MAX_RANGE_M" \
+    --step_m "$STEP_M" \
+    --max_iters "$MAX_ITERS" \
+    $DEBUG_FLAG
+
+#
+# Expected output format:
+#
+#   === GROUND POINT ===
+#   Latitude : <...>
+#   Longitude: <...>
+#   DEM h(MSL): <...> m
+#
+# You can compare those values with what I report in the paper/report.
+#
+# To adapt this script to your own data:
+#   1. Change LAT_DRONE, LON_DRONE, ALT_ORTHO.
+#   2. Replace OSD_YAW, DRONE_PITCH, DRONE_ROLL with your log values.
+#   3. Adjust the yaw offset formula if your platform uses a different convention.
+#   4. Update GIMBAL_* angles, camera intrinsics, and (U, V) as needed.
+#   5. Point DEM_URL / GEOID_URL to suitable datasets for your area.
+#
