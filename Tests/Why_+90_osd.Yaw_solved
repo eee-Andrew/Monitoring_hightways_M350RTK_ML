@@ -1,0 +1,39 @@
+'''
+Why am I adding +90° to the OSD yaw?
+
+This is the only slightly “tricky” part, so I’ll spell it out.
+
+The code itself works in an ENU-like world frame:
+
+x axis ≈ East
+
+y axis ≈ North
+
+z axis up
+
+The rotation Rz(yaw) is a standard math rotation:
+
+yaw = 0° → facing +x (East)
+
+yaw = 90° → facing +y (North)
+
+In many drone OSDs, however, the “yaw” / “heading” is reported in a more “navigation” style:
+
+0° = North
+
+90° = East
+
+180° = South
+
+270° = West
+
+So the OSD yaw and the yaw used inside the math do not share the same zero direction and sign convention.
+
+When I started validating this against ground truth, I noticed a systematic rotation error:
+the reconstructed rays were consistently rotated relative to where they should be.
+
+By comparing against known points and map features, I found that:
+
+To align the OSD yaw with the yaw convention used in the solver,
+I need to add +90° before passing it to --drone_yaw.
+'''
