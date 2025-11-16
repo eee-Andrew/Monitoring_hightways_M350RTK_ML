@@ -182,8 +182,6 @@ python ./compute_global_coordinates_newton_edm.py \
 #   Longitude: <...>
 #   DEM h(MSL): <...> m
 #
-# You can compare those values with what I report in the paper/report.
-#
 # To adapt this script to your own data:
 #   1. Change LAT_DRONE, LON_DRONE, ALT_ORTHO.
 #   2. Replace OSD_YAW, DRONE_PITCH, DRONE_ROLL with your log values.
