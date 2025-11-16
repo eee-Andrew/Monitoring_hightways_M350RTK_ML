@@ -1,7 +1,8 @@
 # DEM Ray–Intersection Test (SPATRA v9)
 
 This folder contains a small, self-contained test that shows how I use  
-`.py` to intersect a camera ray with a DEM and recover the
+`compute_global_coordinates_newton_edm.py
+` to intersect a camera ray with a DEM and recover the
 ground point (lat, lon, height).
 
 The idea is:
@@ -13,7 +14,7 @@ The idea is:
 5. March that ray down until it hits the DEM surface.
 6. Report the intersection point as a ground coordinate.
 
-This test script is what a reviewer can run to reproduce the numbers I report.
+This test script is what a researcher can run to reproduce the numbers I report.
 
 ---
 
