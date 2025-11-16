@@ -1,0 +1,63 @@
+# DEM Ray–Intersection Test (SPATRA v9)
+
+This folder contains a small, self-contained test that shows how I use  
+`.py` to intersect a camera ray with a DEM and recover the
+ground point (lat, lon, height).
+
+The idea is:
+
+1. Take the drone GNSS position (lat, lon, altitude).
+2. Take the drone attitude from the OSD (yaw, pitch, roll).
+3. Take the gimbal angles (yaw, pitch, roll).
+4. Build the camera ray in world coordinates.
+5. March that ray down until it hits the DEM surface.
+6. Report the intersection point as a ground coordinate.
+
+This test script is what a reviewer can run to reproduce the numbers I report.
+
+---
+
+## 1. How to run (PowerShell)
+
+Example command (PowerShell) using **my actual values**:
+
+```powershell
+# Example: single-ray intersection against Copernicus DEM + EGM96 geoid
+
+# OSD yaw from the flight log
+$osd_yaw = 259.0
+
+# IMPORTANT:
+# The solver expects yaw in a different frame, so here I manually add +90°
+# to map my OSD yaw into the yaw convention used by the code.
+$yaw_for_solver = $osd_yaw + 90.0
+
+python .\dem_center_pixel_v9.py `
+    --lat 41.14583768 `
+    --lon 24.91531038 `
+    --alt_ortho 124.18 `
+
+    --drone_yaw $yaw_for_solver `
+    --drone_pitch -0.2 `
+    --drone_roll 0.4 `
+
+    --gimbal_yaw 94.5 `
+    --gimbal_pitch -33 `
+    --gimbal_roll 0.0 `
+
+    --rcg zforward_to_zdown `
+
+    --fx 1601280 `
+    --fy 1801440 `
+    --cx 2592 `
+    --cy 1944 `
+    --u 1296 `
+    --v 800 `
+
+    --dem "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N41_00_E024_00_DEM/Copernicus_DSM_COG_10_N41_00_E024_00_DEM.tif" `
+    --geoid "https://download.osgeo.org/proj/vdatum/egm96_15/egm96_15.gtx" `
+
+    --max_range_m 6000 `
+    --step_m 50 `
+    --max_iters 2 `
+    --debug
