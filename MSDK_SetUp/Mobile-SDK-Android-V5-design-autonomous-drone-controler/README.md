@@ -150,6 +150,7 @@ For further detail on how to integrate the DJI Android SDK into your Android Stu
 
 
 ## Support
+You can get support by contact to author : avalvis@pme.duth.gr
 
 You can get support from DJI with the following method:
 
